@@ -59,6 +59,14 @@ async def _preparar(hass: HomeAssistant) -> None:
         network="Metro Bilbao",
         direction_label="Bilbao (norte)",
     )
+    _estado(
+        hass,
+        "sensor.bus",
+        21,
+        network_key="bizkaibus",
+        network="Bizkaibus",
+        direction_label="A3613 · BILBAO",
+    )
 
 
 async def _pregunta(hass: HomeAssistant, frase: str) -> str:
@@ -91,3 +99,27 @@ async def test_frase_con_destino(hass: HomeAssistant) -> None:
     await _preparar(hass)
     respuesta = await _pregunta(hass, "cuándo llega el próximo tranvía hacia La Casilla")
     assert "5 minutos" in respuesta, respuesta
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        "cuándo pasa el tren",
+        "falta mucho para el bus",
+        "dime el próximo tranvía",
+        "qué hora es el próximo tranvía",
+        "a qué hora sale el metro",
+        "próximo bizkaibus",
+        "cuándo viene el autobús",
+        "el próximo metro a Bilbao",
+        "cuánto falta para el próximo autobús",
+        "dime cuándo llega el metro",
+    ],
+)
+async def test_frases_normales(hass: HomeAssistant, frase: str) -> None:
+    """Frases como las que se dicen de verdad, no solo la canónica."""
+    await _preparar(hass)
+    respuesta = await _pregunta(hass, frase)
+    assert "no he entendido" not in respuesta.lower(), f"«{frase}» -> {respuesta}"
+    assert "no conozco" not in respuesta.lower(), f"«{frase}» -> {respuesta}"
+    assert "minuto" in respuesta.lower(), f"«{frase}» -> {respuesta}"

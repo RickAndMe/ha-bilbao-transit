@@ -122,15 +122,16 @@ def describe(fila: dict[str, Any], language: str = "es") -> str:
     if language.startswith("es"):
         if minutos == 0:
             cuando = "ahora mismo"
-        elif minutos == 1:
-            cuando = "en 1 minuto"
+            # decir "ahora mismo, a las 19:22" suena a contradecirse
+            hora = f" ({fila['departure']})" if fila.get("departure") else ""
         else:
-            cuando = f"en {minutos} minutos"
-        hora = f", a las {fila['departure']}" if fila.get("departure") else ""
+            cuando = "en 1 minuto" if minutos == 1 else f"en {minutos} minutos"
+            hora = f", a las {fila['departure']}" if fila.get("departure") else ""
         return f"el {transporte}{linea} hacia {direccion} sale {cuando}{hora}"
-    if minutos == 1:
-        cuando = "in 1 minute"
+    if minutos == 0:
+        cuando = "right now"
+        hora = f" ({fila['departure']})" if fila.get("departure") else ""
     else:
-        cuando = f"in {minutos} minutes"
-    hora = f", at {fila['departure']}" if fila.get("departure") else ""
+        cuando = "in 1 minute" if minutos == 1 else f"in {minutos} minutes"
+        hora = f", at {fila['departure']}" if fila.get("departure") else ""
     return f"the {transporte}{linea} towards {direccion} leaves {cuando}{hora}"

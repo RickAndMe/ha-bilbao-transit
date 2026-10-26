@@ -229,3 +229,41 @@ async def test_la_direccion_no_repite_la_linea(hass: HomeAssistant) -> None:
     assert filas[0]["direction"] == "BILBAO"
     assert filas[0]["destination"] == "BILBAO"
     assert "A3613" not in describe(filas[0]).split("hacia")[1]
+
+
+@pytest.mark.asyncio
+async def test_frases_se_actualizan_solas(hass: HomeAssistant) -> None:
+    """Si el fichero es una versión nuestra sin tocar, se mejora sin preguntar."""
+    from custom_components.bilbao_transit import sentences
+
+    fichero = Path(hass.config.path("custom_sentences", "es", "bilbao_transit.yaml"))
+    fichero.parent.mkdir(parents=True, exist_ok=True)
+    fichero.write_text(sentences._V1_ES, encoding="utf-8")
+
+    await async_ensure_sentences(hass)
+
+    contenido = fichero.read_text(encoding="utf-8")
+    assert contenido.startswith("# huella:")
+    assert "dime [el|la]" in contenido  # plantilla nueva
+    assert contenido.count("language: es") == 1
+
+
+@pytest.mark.asyncio
+async def test_frases_editadas_no_se_pisan(hass: HomeAssistant) -> None:
+    """Con la huella rota (fichero tocado), no se sobrescribe."""
+    fichero = Path(hass.config.path("custom_sentences", "es", "bilbao_transit.yaml"))
+    fichero.parent.mkdir(parents=True, exist_ok=True)
+    fichero.write_text("# huella: 0000000000000000\nlanguage: es\nintents: {}\n", encoding="utf-8")
+
+    await async_ensure_sentences(hass)
+
+    assert "0000000000000000" in fichero.read_text(encoding="utf-8")
+
+
+def test_ahora_mismo_no_repite_la_hora() -> None:
+    """'sale ahora mismo (19:22)' en vez de 'ahora mismo, a las 19:22'."""
+    fila = {"network": "metro", "direction": "Kabiezes", "minutes": 0, "departure": "19:22", "line": "L2"}
+    frase = describe(fila)
+    assert "ahora mismo" in frase
+    assert "a las" not in frase
+    assert "(19:22)" in frase

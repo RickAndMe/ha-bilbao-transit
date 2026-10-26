@@ -38,6 +38,13 @@ class NextDepartureIntent(intent.IntentHandler):
         red = red_desde_texto(dicho)
         filas = departures(hass, network=red, sentido=sentido)
 
+        # el usuario ha dicho un destino que no tenemos configurado: en vez de
+        # "no hay salidas", dar la más cercana y avisar
+        sin_destino = False
+        if not filas and sentido:
+            filas = departures(hass, network=red)
+            sin_destino = bool(filas)
+
         respuesta = intent_obj.create_response()
 
         if not filas:
@@ -58,6 +65,8 @@ class NextDepartureIntent(intent.IntentHandler):
         idioma = getattr(intent_obj, "language", None) or hass.config.language or "es"
         frase = describe(cercana, idioma)
         texto = f"{frase[0].upper()}{frase[1:]}."
+        if sin_destino:
+            texto = f"No tengo ese destino configurado. {texto}"
         if len(filas) > 1:
             siguiente = filas[1]
             texto += (

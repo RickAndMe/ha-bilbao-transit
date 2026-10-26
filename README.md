@@ -163,6 +163,11 @@ Funciona por las dos vías, sin configurar nada a mano:
 
 y contesta: *«El tranvía (TR) hacia La Casilla sale en 5 minutos, a las 18:34.»*
 
+También entiende «dime el próximo tranvía», «falta mucho para el bus», «qué hora es el
+próximo metro», «cuándo pasa el tren» o «próximo bizkaibus a Bilbao». El fichero de
+frases se actualiza solo con cada versión de la integración, salvo que lo edites tú:
+entonces se respeta lo tuyo y deja de tocarlo.
+
 **Con un asistente de IA** (OpenAI, Ollama, DeepSeek…). Expone la herramienta
 `bilbao_transit_next_departures`, así que entiende preguntas libres y las mezcla con el
 resto de la casa: *«¿me da tiempo a tender la ropa si salgo ahora a por el metro?»*.
