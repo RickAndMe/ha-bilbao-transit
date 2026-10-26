@@ -3,47 +3,47 @@
     "step": {
       "user": {
         "title": "Bilbao Transit",
-        "description": "Elige la red de transporte que quieres añadir.",
+        "description": "Choose the transit network to add.",
         "data": {
-          "network": "Red"
+          "network": "Network"
         }
       },
       "stop": {
-        "title": "Elige la parada",
-        "description": "Paradas de {network} ordenadas por distancia a la ubicación de tu Home Assistant.",
+        "title": "Choose the stop",
+        "description": "{network} stops sorted by distance from your Home Assistant location.",
         "data": {
-          "stop_id": "Parada"
+          "stop_id": "Stop"
         }
       },
       "directions": {
-        "title": "Elige los sentidos",
-        "description": "Sentidos disponibles en {stop}. Se creará un sensor por cada uno.",
+        "title": "Choose the directions",
+        "description": "Directions available at {stop}. One sensor is created per direction.",
         "data": {
-          "directions": "Sentidos"
+          "directions": "Directions"
         }
       }
     },
     "error": {
-      "cannot_connect": "No se pudo descargar el horario oficial. Comprueba la conexión a internet y reinténtalo."
+      "cannot_connect": "Could not download the official timetable. Check the internet connection and try again."
     },
     "abort": {
-      "already_configured": "Esa parada ya está configurada.",
-      "stop_not_found": "La parada ya no existe en el horario oficial."
+      "already_configured": "That stop is already configured.",
+      "stop_not_found": "The stop no longer exists in the official timetable."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Sentidos a mostrar",
-        "description": "Marca los sentidos que quieres tener como sensores.",
+        "title": "Directions to show",
+        "description": "Select the directions you want as sensors.",
         "data": {
-          "directions": "Sentidos"
+          "directions": "Directions"
         }
       }
     },
     "abort": {
-      "cannot_connect": "No se pudo descargar el horario oficial.",
-      "stop_not_found": "La parada ya no existe en el horario oficial."
+      "cannot_connect": "Could not download the official timetable.",
+      "stop_not_found": "The stop no longer exists in the official timetable."
     }
   }
 }
