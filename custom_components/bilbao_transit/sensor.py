@@ -133,6 +133,7 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
             "stop_id": self._stop.stop_id,
             "stop_name": self._stop.name,
             "network": self._network_name,
+            "network_key": self.coordinator.network,
             "network_emoji": network.get("emoji", "🚏"),
             "network_icon": network.get("icon"),
             "direction": self._direction,

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_DIRECTION_LABELS, CONF_NETWORK, DOMAIN, NETWORKS
 from .coordinator import BilbaoTransitCoordinator
@@ -14,6 +16,78 @@ from .coordinator import BilbaoTransitCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+FRONTEND_KEY = f"{DOMAIN}_frontend"
+CARD_URL = "/bilbao_transit/bilbao-transit-card.js"
+FRONTEND_DIR = Path(__file__).parent / "frontend"
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Registra la tarjeta del dashboard y la voz (no depende de config entries)."""
+    await _async_register_card(hass)
+    await _async_register_voice(hass)
+    return True
+
+
+async def _async_register_voice(hass: HomeAssistant) -> None:
+    """Registra el intent de voz y la herramienta para el asistente con IA."""
+    store = hass.data.setdefault(FRONTEND_KEY, {})
+    if store.get("voice"):
+        return
+
+    from homeassistant.helpers import intent as intent_helper
+
+    from .intents import NextDepartureIntent
+    from .llm_api import BilbaoTransitAPI
+    from .sentences import async_ensure_sentences
+
+    try:
+        intent_helper.async_register(hass, NextDepartureIntent())
+    except ValueError:
+        # ya registrado (recarga en caliente)
+        _LOGGER.debug("Intent de voz ya registrado")
+
+    try:
+        from homeassistant.helpers import llm as llm_helper
+
+        store["llm_unregister"] = llm_helper.async_register_api(
+            hass, BilbaoTransitAPI(hass)
+        )
+    except Exception:  # noqa: BLE001 - la voz local sigue funcionando sin IA
+        _LOGGER.exception("No se pudo registrar la herramienta del asistente con IA")
+
+    await async_ensure_sentences(hass)
+    store["voice"] = True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Sirve el JS de la tarjeta y lo añade al frontend una sola vez.
+
+    Se sirve desde la propia integración para que el usuario no tenga que
+    descargar nada aparte: al actualizar la integración la tarjeta aparece.
+    """
+    store = hass.data.setdefault(FRONTEND_KEY, {})
+    if store.get("registered"):
+        return
+
+    if "http" not in hass.config.components:
+        # en tests (o en un arranque sin frontend) no hay servidor HTTP
+        return
+
+    from homeassistant.components.frontend import add_extra_js_url
+    from homeassistant.components.http import StaticPathConfig
+
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig("/bilbao_transit", str(FRONTEND_DIR), cache_headers=False)]
+        )
+    except RuntimeError:
+        # ya registrada por una recarga anterior
+        _LOGGER.debug("Ruta estática de la tarjeta ya registrada")
+
+    add_extra_js_url(hass, CARD_URL)
+    store["registered"] = True
+    _LOGGER.debug("Tarjeta Bilbao Transit disponible en %s", CARD_URL)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -77,7 +77,7 @@ servicio ahora mismo).
 | `next_departures` | Las 5 siguientes salidas: hora, minutos, destino y línea. |
 | `destination`, `line` | Destino final y línea del próximo. |
 | `direction_label` | El sentido en lenguaje humano (`Bilbao (norte)`, `A2610 · GALDAKAO`). |
-| `network_emoji`, `network_icon` | 🚇 / 🚊 / 🚌 y su icono `mdi` equivalente. |
+| `network_key`, `network_emoji`, `network_icon` | `metro`/`tram`/`bizkaibus`/`bilbobus`, su emoji y su icono `mdi`. |
 | `data_source` | `realtime` o `schedule`: de dónde sale el dato. |
 | `service_status` | `ok`, `horario (sin tiempo real)` o `sin servicio`. |
 | `stop_name`, `stop_id` | Parada. |
@@ -89,11 +89,42 @@ Bidezabal, Larrabasterra, Sopela, Urduliz, Ibarbengoa y San Ignazio (L1). El sen
 llama *hacia Bilbao (norte)* y **cada salida lleva su destino real y su línea**, deducida
 del origen del viaje (la L1 sale de Etxebarri, la L2 de Basauri).
 
-## Tarjeta lista para pegar
+## Tarjeta incluida
 
-Muestra **lo que llega antes arriba**, con un icono por medio y el más urgente en rojo.
-Descubre sola todas las entidades de la integración: los buses que añadas después
-aparecen sin tocar nada.
+La integración **sirve su propia tarjeta**, no hay que descargar nada aparte: al
+actualizar, aparece `Bilbao Transit` en el selector de tarjetas del dashboard.
+
+<p align="center">
+  <img src="docs/preview.png" alt="Tarjeta de Bilbao Transit con metro, tranvía y buses" width="430">
+</p>
+
+```yaml
+type: custom:bilbao-transit-card
+title: Bolueta      # opcional
+max: 8             # opcional: cuántas salidas mostrar
+```
+
+Qué hace:
+
+- **Lo que llega antes, arriba.** Ordena todas las salidas por minutos, sin importar
+  la red.
+- **El número manda**: los minutos en grande, lo primero que ve el ojo.
+- **Color por red**: metro rojo, tranvía turquesa, Bizkaibus ámbar, Bilbobus azul.
+- **La vía de abajo no es decoración**: el vehículo se coloca según lo que falta, así
+  que de un vistazo sabes qué está a punto de entrar sin leer ningún número.
+- **Aviso de urgencia**: cuando faltan 3 minutos o menos, la tarjeta late y el número
+  se pone rojo.
+- **🟢 en directo / ⚪ horario**: nunca te vende un horario como si fuera tiempo real.
+- Se adapta a tu tema claro u oscuro y respeta la opción de reducir animaciones del
+  sistema.
+
+Si prefieres no usar la tarjeta, `type: entities` con tus sensores también vale: el
+estado ya son los minutos.
+
+### Alternativa en markdown
+
+Para un dashboard al que no quieras añadir recursos, esta tarjeta markdown hace lo
+mismo pero sin animaciones:
 
 ```yaml
 type: markdown
@@ -120,8 +151,25 @@ content: |
   <small>🟢 tiempo real · ⚪ horario programado</small>
 ```
 
-Si prefieres lo simple, `type: entities` con tus sensores también vale: el estado ya son
-los minutos.
+## Preguntar por voz
+
+Funciona por las dos vías, sin configurar nada a mano:
+
+**Con el asistente local** (el de reglas, sin IA). La integración deja sus frases en
+`config/custom_sentences/es/bilbao_transit.yaml`, así que puedes decir:
+
+> «¿Cuándo llega el tranvía?» · «¿Cuánto falta para el metro?» ·
+> «Próximo autobús hacia Bilbao»
+
+y contesta: *«El tranvía (TR) hacia La Casilla sale en 5 minutos, a las 18:34.»*
+
+**Con un asistente de IA** (OpenAI, Ollama, DeepSeek…). Expone la herramienta
+`bilbao_transit_next_departures`, así que entiende preguntas libres y las mezcla con el
+resto de la casa: *«¿me da tiempo a tender la ropa si salgo ahora a por el metro?»*.
+Selecciona **Bilbao Transit** en el apartado de control de dispositivos del agente.
+
+Si editas el fichero de frases, se respeta lo tuyo: la integración solo lo crea si no
+existe.
 
 ## Automatizaciones útiles
 
