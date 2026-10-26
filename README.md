@@ -75,30 +75,54 @@ Basauri.
 Actualización: cada 45 segundos (el feed oficial se refresca cada ~30 s).
 El horario estático se descarga una vez cada 12 h y se cachea en memoria.
 
-## Tarjeta con las 3 próximas salidas
+## Tarjeta con las próximas salidas
 
 El estado del sensor es solo el próximo bus/tren; los siguientes van en el atributo
 `next_departures`. Esta tarjeta **descubre sola todas las entidades de la integración**
-(así los buses que añadas después aparecen sin tocar nada) y pinta las 3 próximas de
-cada una, con hora, línea, destino y minutos:
+(los buses que añadas después aparecen sin tocar nada), agrupa por red y parada, pone un
+icono por medio (🚇 metro, 🚊 tranvía, 🚌 bus) y marca cada sentido con 🟢 si el dato es
+una estimación en tiempo real o ⚪ si viene del horario programado:
 
 ```yaml
 type: markdown
 title: Bolueta
 content: |
-  {%- set entidades = states.sensor | selectattr('attributes.network', 'defined')
+  {%- set emoji = {'Metro Bilbao': '🚇', 'Euskotren Tranvía Bilbao': '🚊',
+                   'Bizkaibus': '🚌', 'Bilbobus': '🚌'} -%}
+  {%- set orden = ['Metro Bilbao', 'Euskotren Tranvía Bilbao', 'Bizkaibus', 'Bilbobus'] -%}
+  {%- set punto = {'realtime': '🟢', 'schedule': '⚪'} -%}
+  {%- set ents = states.sensor | selectattr('attributes.network', 'defined')
        | selectattr('attributes.next_departures', 'defined') | list -%}
-  {%- for e in entidades | sort(attribute='attributes.stop_name') %}
-  {%- set salidas = (e.attributes.next_departures or [])[:3] %}
-  {%- if salidas %}
-
-  **{{ e.name }}**
-  {% for s in salidas -%}
-  · {{ s.departure }} · {{ s.line ~ ' ' if s.line }}{{ s.destination or s.headsign }} — **{{ s.minutes }} min**
+  {%- set redes = orden | select('in', ents | map(attribute='attributes.network') | list) | list -%}
+  {%- set paradas = ents | map(attribute='attributes.stop_name') | unique | sort | list -%}
+  {%- for red in redes %}
+  {%- for parada in paradas %}
+  {%- set grupo = ents | selectattr('attributes.network', 'eq', red)
+       | selectattr('attributes.stop_name', 'eq', parada) | list %}
+  {%- if grupo %}
+  #### {{ emoji.get(red, '🚏') }} {{ red }} · {{ parada }}
+  {% for e in grupo | sort(attribute='name') -%}
+  {%- set salidas = (e.attributes.next_departures or [])[:3] -%}
+  {%- set cercanas = salidas | selectattr('minutes', 'le', 60) | list -%}
+  {%- set mostrar = cercanas if cercanas else salidas[:1] -%}
+  {%- set sentido = e.name | replace('(' ~ red ~ ')', '') | replace(parada, '') | trim | replace('hacia ', '') -%}
+  {%- if mostrar -%}
+  - {{ punto.get(e.attributes.data_source, '') }} **{{ sentido }}** — {% for s in mostrar %}{{ ' · ' if not loop.first }}**{{ s.minutes }} min** <span style="opacity:.5">{{ s.departure }}</span>{% if s.destination not in sentido %} {{ s.line ~ ' ' if s.line }}{{ s.destination or s.headsign }}{% endif %}{% endfor %}
+  {% endif -%}
   {% endfor %}
   {%- endif %}
   {%- endfor %}
+  {%- endfor %}
+  <small>🟢 estimación en tiempo real · ⚪ horario programado</small>
 ```
+
+Detalles del diseño, por si quieres retocarlo:
+
+- solo se listan las salidas a **menos de 60 minutos** (si no hay ninguna, la próxima);
+  con los buses evita listas eternas de horarios lejanos;
+- la hora va en gris claro y los minutos en negrita, que es el dato que se mira;
+- el destino se omite cuando ya está en el nombre del sentido (`A2610 · GALDAKAO`), y se
+  muestra solo cuando cambia (`… A3613 OROZKO`).
 
 Si prefieres una lista clásica de entidades (solo el próximo), sirve `type: entities`
 con cada sensor.
