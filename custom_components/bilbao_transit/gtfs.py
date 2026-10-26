@@ -154,7 +154,9 @@ class StaticFeed:
 
         labels: dict[str, str] = {}
         for key, headsigns in counts.items():
-            top = max(headsigns.items(), key=lambda item: item[1])[0]
+            # desempate alfabético: sin él, dos destinos con la misma frecuencia
+            # dependen del orden (no estable) del set de viajes
+            top = sorted(headsigns.items(), key=lambda item: (-item[1], item[0]))[0][0]
             if multi_line:
                 route_id, _ = split_key(key)
                 line = self.lines.get(route_id)

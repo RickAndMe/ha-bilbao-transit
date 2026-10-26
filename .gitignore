@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 tests/e2e_local.py
 tests/probe_flow.py
+docs/preview.html
