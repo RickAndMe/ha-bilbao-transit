@@ -88,16 +88,39 @@ class BilbaoTransitCard extends HTMLElement {
   setConfig(config) {
     this._config = { title: "Transporte", max: 8, ...config };
     this._montado = false;
-    this._render();
+    try {
+      this._render();
+    } catch (err) {
+      this._mostrarError(err);
+    }
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    try {
+      this._render();
+    } catch (err) {
+      this._mostrarError(err);
+    }
   }
 
   getCardSize() {
     return 3 + (this._filas.size || 4) * 1.5;
+  }
+
+  getGridOptions() {
+    return { columns: "full", rows: "auto", min_columns: 6 };
+  }
+
+  // si algo falla, se ve el motivo en la tarjeta en vez de romper el dashboard
+  _mostrarError(err) {
+    if (!this.shadowRoot) return;
+    const mensaje = err && err.message ? err.message : String(err);
+    this.shadowRoot.innerHTML =
+      '<div style="padding:16px;font:14px system-ui;color:var(--error-color)">' +
+      "Error en la tarjeta de Bilbao Transit: " +
+      mensaje +
+      "</div>";
   }
 
   _t(clave) {

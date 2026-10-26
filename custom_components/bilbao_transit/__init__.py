@@ -86,8 +86,39 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Ruta estática de la tarjeta ya registrada")
 
     add_extra_js_url(hass, CARD_URL)
+    await _async_ensure_lovelace_resource(hass)
     store["registered"] = True
     _LOGGER.debug("Tarjeta Bilbao Transit disponible en %s", CARD_URL)
+
+
+async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
+    """Registra la tarjeta como recurso de Lovelace (si no está ya).
+
+    Inyectar el módulo con ``add_extra_js_url`` no basta: el dashboard necesita
+    la tarjeta en la lista de recursos para reconocerla (si falta, la tarjeta da
+    "Configuration error"). Se hace una sola vez y sin tocar los recursos del
+    usuario.
+    """
+    try:
+        from homeassistant.components.lovelace import LOVELACE_DATA
+        from homeassistant.components.lovelace.resources import ResourceStorageCollection
+
+        datos = hass.data.get(LOVELACE_DATA)
+        if datos is None:
+            return
+        recursos = datos.resources
+        if not isinstance(recursos, ResourceStorageCollection):
+            # Lovelace en modo YAML: no se pueden añadir recursos desde aquí
+            return
+        if not recursos.loaded:
+            await recursos.async_load()
+        existentes = await recursos.async_items()
+        if any(item.get("url") == CARD_URL for item in existentes):
+            return
+        await recursos.async_create_item({"res_type": "module", "url": CARD_URL})
+        _LOGGER.info("Tarjeta registrada como recurso de Lovelace (%s)", CARD_URL)
+    except Exception:  # noqa: BLE001 - nunca debe impedir que arranque la integración
+        _LOGGER.exception("No se pudo registrar la tarjeta como recurso de Lovelace")
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
