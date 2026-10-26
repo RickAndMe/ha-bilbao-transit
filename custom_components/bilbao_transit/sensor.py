@@ -91,6 +91,7 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
         super().__init__(coordinator)
         self._stop = stop
         self._key = key
+        self._label = label
         self._route_id, self._direction = split_key(key)
         network = NETWORKS[coordinator.network]
         self._network_name = network["name"]
@@ -127,15 +128,23 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
     def extra_state_attributes(self) -> dict[str, Any]:
         departures, source = self._departures
         feed_timestamp = self.coordinator.data.get("feed_timestamp")
+        network = NETWORKS[self.coordinator.network]
         attributes: dict[str, Any] = {
             "stop_id": self._stop.stop_id,
             "stop_name": self._stop.name,
             "network": self._network_name,
+            "network_emoji": network.get("emoji", "🚏"),
+            "network_icon": network.get("icon"),
+            "direction": self._direction,
+            "direction_label": self._label,
             "line": departures[0]["line"] if departures else None,
             "route_id": self._route_id or None,
-            "direction": self._direction,
             "service_status": STATUS_BY_SOURCE.get(source, source),
             "data_source": source,
+            # Numérico a propósito: permite ordenar entidades por cercanía desde
+            # plantillas Jinja (el sandbox de HA no deja ordenar por `state`, que
+            # es texto) y sirve para automatizaciones del tipo "si faltan <3 min".
+            "next_minutes": departures[0]["in_minutes"] if departures else None,
             "next_departures": [
                 {
                     "departure": dt_util.as_local(

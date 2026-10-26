@@ -163,6 +163,12 @@ async def test_sensores_dan_minutos_destino_y_linea(
     assert north.attributes["unit_of_measurement"] == "min"
     assert south.attributes["destination"] == "Basauri"
 
+    # atributos pensados para la UI y las automatizaciones
+    assert north.attributes["next_minutes"] == 3
+    assert north.attributes["network_emoji"] == "🚇"
+    assert north.attributes["direction_label"] == "Bilbao (norte)"
+    assert south.attributes["direction_label"] == "Basauri/Etxarri (sur)"
+
 
 async def test_sin_servicio_deja_sensor_unknown(hass: HomeAssistant, patch_network) -> None:
     """Si el feed no trae trenes, el estado queda vacío pero el atributo lo explica."""
@@ -371,6 +377,9 @@ async def test_sensor_de_bus_sin_tiempo_real_usa_horario(
 
     assert sensor.state == "5"
     assert sensor.attributes["line"] == "A3613"
+    assert sensor.attributes["next_minutes"] == 5
+    assert sensor.attributes["network_emoji"] == "🚌"
+    assert sensor.attributes["direction_label"] == "A3613 · OROZKO"
     assert sensor.attributes["data_source"] == "schedule"
     assert sensor.attributes["service_status"] == "horario (sin tiempo real)"
     # dos salidas de la misma línea, cada una con su destino final

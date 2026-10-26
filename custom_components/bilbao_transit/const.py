@@ -29,6 +29,7 @@ NETWORKS: dict[str, dict] = {
         ),
         "agency_filter": None,
         "icon": "mdi:train-variant",
+        "emoji": "🚇",
         # El GTFS solo publica una ruta ("MB"): el sentido es global
         # (0 = norte hacia Bilbao, 1 = sur) y se etiqueta por su significado real,
         # porque cada tren puede terminar en un destino distinto.
@@ -64,6 +65,7 @@ NETWORKS: dict[str, dict] = {
         # Solo las líneas del tranvía de Bilbao dentro del feed de Euskotren
         "agency_filter": "ES:Euskotren:Operator:EUS_TrBi:",
         "icon": "mdi:tram",
+        "emoji": "🚊",
         "direction_labels": None,
         "line_terminals": None,
         "multi_line": False,
@@ -81,6 +83,7 @@ NETWORKS: dict[str, dict] = {
         ),
         "agency_filter": None,
         "icon": "mdi:bus",
+        "emoji": "🚌",
         "direction_labels": None,
         "line_terminals": None,
         # Varias líneas por parada: hay que elegir línea y sentido.
@@ -98,6 +101,7 @@ NETWORKS: dict[str, dict] = {
         "rt_url": None,
         "agency_filter": None,
         "icon": "mdi:bus-side",
+        "emoji": "🚌",
         "direction_labels": None,
         "line_terminals": None,
         "multi_line": True,
