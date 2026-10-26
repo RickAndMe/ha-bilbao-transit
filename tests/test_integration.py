@@ -11,6 +11,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bilbao_transit.const import DOMAIN
+from custom_components.bilbao_transit import gtfs as gtfs_module
 from custom_components.bilbao_transit.gtfs import StaticFeed, Stop, TripMeta
 
 STOP = Stop(
@@ -73,14 +74,18 @@ def _realtime():
 
 @pytest.fixture
 def patch_network(monkeypatch):
-    """Evita la red: estático y tiempo real sintéticos."""
+    """Evita la red: índice de paradas, estático y tiempo real sintéticos."""
+    monkeypatch.setattr(
+        "custom_components.bilbao_transit.config_flow.load_stop_index",
+        lambda network: _static().stops,
+    )
     monkeypatch.setattr(
         "custom_components.bilbao_transit.config_flow.load_static",
-        lambda network: _static(),
+        lambda network, stop_ids=None: _static(),
     )
     monkeypatch.setattr(
         "custom_components.bilbao_transit.coordinator.load_static",
-        lambda network: _static(),
+        lambda network, stop_ids=None: _static(),
     )
     monkeypatch.setattr(
         "custom_components.bilbao_transit.coordinator.fetch_realtime",
@@ -223,3 +228,154 @@ async def test_migracion_v1_a_v2_renombra_sentidos(
 
     names = {s.attributes.get("friendly_name", "") for s in hass.states.async_all("sensor")}
     assert any("Bilbao (norte)" in name for name in names), names
+
+
+def _bus_feed():
+    """Red de bus con dos líneas y sentido, con horario relativo a ahora."""
+    import datetime as dt
+
+    now = dt.datetime.now().astimezone()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    offset = int((now - midnight).total_seconds())
+    stop = Stop(
+        stop_id="290",
+        name="METRO BOLUETA",
+        lat=43.2468,
+        lon=-2.9073,
+        stop_ids=frozenset({"290"}),
+    )
+    return StaticFeed(
+        network="bizkaibus",
+        stops={"290": stop},
+        trip_meta={
+            "bus1": TripMeta(
+                direction="0",
+                headsign="UGAO-MIRABALLES",
+                route_id="3613",
+                line="A3613",
+                service_id="LAB",
+            ),
+            "bus1b": TripMeta(
+                direction="0",
+                headsign="OROZKO",
+                route_id="3613",
+                line="A3613",
+                service_id="LAB",
+            ),
+            "bus2": TripMeta(
+                direction="1",
+                headsign="BILBAO",
+                route_id="2610",
+                line="A2610",
+                service_id="LAB",
+            ),
+        },
+        stop_trips={"290": {"bus1", "bus1b", "bus2"}},
+        stop_departures={
+            "290": [
+                ("bus1", offset + 300),
+                ("bus1b", offset + 900),
+                ("bus2", offset + 600),
+            ]
+        },
+        lines={
+            "3613": gtfs_module.Line(route_id="3613", short="A3613", long="BILBAO-UGAO"),
+            "2610": gtfs_module.Line(route_id="2610", short="A2610", long="BILBAO-GALDAKAO"),
+        },
+        services={
+            "LAB": gtfs_module.Service(
+                days=frozenset(range(7)),
+                start=dt.date(2020, 1, 1),
+                end=dt.date(2030, 12, 31),
+            )
+        },
+        fetched_at=time.time(),
+    )
+
+
+async def test_config_flow_de_bus_pide_linea(hass: HomeAssistant, monkeypatch) -> None:
+    """En los buses el alta pasa por elegir líneas y luego sentidos."""
+    bus_feed = _bus_feed()
+    monkeypatch.setattr(
+        "custom_components.bilbao_transit.config_flow.load_stop_index",
+        lambda network: bus_feed.stops,
+    )
+    monkeypatch.setattr(
+        "custom_components.bilbao_transit.config_flow.load_static",
+        lambda network, stop_ids=None: bus_feed,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"network": "bizkaibus"}
+    )
+    assert result["step_id"] == "stop"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"stop_id": "290"}
+    )
+    assert result["step_id"] == "lines"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"lines": ["3613"]}
+    )
+    assert result["step_id"] == "directions"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"directions": ["3613|0"]}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["lines"] == ["3613"]
+    assert result["data"]["stop_ids"] == ["290"]
+    assert result["data"]["direction_labels"] == {"3613|0": "A3613 · OROZKO"}
+
+
+async def test_sensor_de_bus_sin_tiempo_real_usa_horario(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """Sin feed en tiempo real el sensor avisa de que va con horario."""
+    bus_feed = _bus_feed()
+    monkeypatch.setattr(
+        "custom_components.bilbao_transit.coordinator.load_static",
+        lambda network, stop_ids=None: bus_feed,
+    )
+    monkeypatch.setattr(
+        "custom_components.bilbao_transit.coordinator.fetch_realtime",
+        lambda network: (None, []),
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="METRO BOLUETA (Bizkaibus)",
+        data={
+            "network": "bizkaibus",
+            "stop_id": "290",
+            "stop_name": "METRO BOLUETA",
+            "stop_ids": ["290"],
+            "lines": ["3613"],
+            "directions": ["3613|0"],
+            "direction_labels": {"3613|0": "A3613 · OROZKO"},
+        },
+        options={},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    sensors = list(hass.states.async_all("sensor"))
+    assert len(sensors) == 1, [s.entity_id for s in sensors]
+    sensor = sensors[0]
+
+    assert sensor.state == "5"
+    assert sensor.attributes["line"] == "A3613"
+    assert sensor.attributes["data_source"] == "schedule"
+    assert sensor.attributes["service_status"] == "horario (sin tiempo real)"
+    # dos salidas de la misma línea, cada una con su destino final
+    assert [d["destination"] for d in sensor.attributes["next_departures"]] == [
+        "UGAO-MIRABALLES",
+        "OROZKO",
+    ]
+

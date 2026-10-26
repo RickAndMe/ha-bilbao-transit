@@ -3,21 +3,28 @@
     "step": {
       "user": {
         "title": "Bilbao Transit",
-        "description": "Elige la red de transporte que quieres añadir.",
+        "description": "Elige la red de transporte que quieres añadir: metro, tranvía, Bizkaibus o Bilbobus.",
         "data": {
           "network": "Red"
         }
       },
       "stop": {
         "title": "Elige la parada",
-        "description": "Paradas de {network} ordenadas por distancia a la ubicación configurada en Home Assistant.",
+        "description": "Paradas de {network} ordenadas por distancia a la ubicación configurada en Home Assistant. La primera es la más cercana.",
         "data": {
           "stop_id": "Parada"
         }
       },
+      "lines": {
+        "title": "Elige las líneas",
+        "description": "Líneas que paran en {stop}. Se crea un sensor por línea y sentido.",
+        "data": {
+          "lines": "Líneas"
+        }
+      },
       "directions": {
         "title": "Elige los sentidos",
-        "description": "Sentidos disponibles en {stop}. Se crea un sensor por cada uno.",
+        "description": "Opciones disponibles en {stop}. Se crea un sensor por cada una.",
         "data": {
           "directions": "Sentidos"
         }
@@ -28,7 +35,9 @@
     },
     "abort": {
       "already_configured": "Esa parada ya está configurada.",
-      "stop_not_found": "La parada ya no existe en el horario oficial."
+      "stop_not_found": "La parada ya no existe en el horario oficial.",
+      "no_lines": "Ninguna línea para en esa parada en el horario oficial.",
+      "no_directions": "No hay sentidos disponibles en esa parada."
     }
   },
   "options": {

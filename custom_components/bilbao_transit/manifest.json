@@ -1,12 +1,14 @@
 {
   "domain": "bilbao_transit",
   "name": "Bilbao Transit (Metro y Tranvía)",
-  "codeowners": ["@RickAndMe"],
+  "codeowners": [
+    "@RickAndMe"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/RickAndMe/ha-bilbao-transit",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/RickAndMe/ha-bilbao-transit/issues",
   "requirements": [],
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import sys
 from pathlib import Path
 
@@ -148,7 +149,7 @@ def test_haversine_metros() -> None:
 def test_directions_usa_etiquetas_de_la_red() -> None:
     """En metro el sentido se llama por su significado, no por el destino."""
     static = _static()
-    assert static.directions(static.stops["3"]) == {
+    assert static.options(static.stops["3"]) == {
         "0": "Bilbao (norte)",
         "1": "Basauri/Etxarri (sur)",
     }
@@ -160,7 +161,140 @@ def test_directions_sin_etiquetas_fijas_usa_destino_dominante() -> None:
     static.network = "tram"
     static.trip_meta["north2"] = gtfs.TripMeta(direction="0", headsign="Kabiezes")
     static.stop_trips["3.0"].add("north2")
-    assert static.directions(static.stops["3"]) == {"0": "Kabiezes", "1": "Basauri"}
+    assert static.options(static.stops["3"]) == {"0": "Kabiezes", "1": "Basauri"}
+
+
+def _bus_static() -> gtfs.StaticFeed:
+    """Parada de bus con dos líneas y dos sentidos."""
+    stop = gtfs.Stop(
+        stop_id="290",
+        name="METRO BOLUETA",
+        lat=43.2468,
+        lon=-2.9073,
+        stop_ids=frozenset({"290"}),
+    )
+    return gtfs.StaticFeed(
+        network="bizkaibus",
+        stops={"290": stop},
+        trip_meta={
+            "bus1": gtfs.TripMeta(
+                direction="0",
+                headsign="UGAO-MIRABALLES",
+                route_id="3613",
+                line="A3613",
+                service_id="LAB",
+            ),
+            "bus2": gtfs.TripMeta(
+                direction="1",
+                headsign="BILBAO",
+                route_id="3613",
+                line="A3613",
+                service_id="LAB",
+            ),
+            "bus3": gtfs.TripMeta(
+                direction="0",
+                headsign="GALDAKAO",
+                route_id="2610",
+                line="A2610",
+                service_id="LAB",
+            ),
+        },
+        stop_trips={"290": {"bus1", "bus2", "bus3"}},
+        stop_departures={
+            "290": [("bus1", 7 * 3600), ("bus2", 7 * 3600 + 900), ("bus3", 7 * 3600 + 300)]
+        },
+        lines={
+            "3613": gtfs.Line(route_id="3613", short="A3613", long="BILBAO-UGAO"),
+            "2610": gtfs.Line(route_id="2610", short="A2610", long="BILBAO-GALDAKAO"),
+        },
+        services={
+            "LAB": gtfs.Service(
+                days=frozenset(range(7)),
+                start=dt.date(2020, 1, 1),
+                end=dt.date(2030, 12, 31),
+            )
+        },
+        fetched_at=0.0,
+    )
+
+
+def test_options_de_bus_distingue_linea_y_sentido() -> None:
+    """En los buses la clave es línea|sentido y la etiqueta lleva la línea."""
+    static = _bus_static()
+    assert static.options(static.stops["290"]) == {
+        "3613|0": "A3613 · UGAO-MIRABALLES",
+        "3613|1": "A3613 · BILBAO",
+        "2610|0": "A2610 · GALDAKAO",
+    }
+
+
+def test_lines_at_ordena_por_frecuencia() -> None:
+    static = _bus_static()
+    lines = static.lines_at(static.stops["290"])
+    assert list(lines) == ["3613", "2610"]
+    assert lines["3613"].short == "A3613"
+
+
+def test_split_key() -> None:
+    assert gtfs.split_key("0") == ("", "0")
+    assert gtfs.split_key("3613|1") == ("3613", "1")
+
+
+def test_clean_headsign() -> None:
+    assert gtfs.clean_headsign("PT-Semana / (LA PEÑA)") == "LA PEÑA"
+    assert gtfs.clean_headsign("OROZKO") == "OROZKO"
+    assert gtfs.clean_headsign(None) == ""
+
+
+def test_scheduled_departures_usa_calendario() -> None:
+    """El horario programado filtra por día y por línea y sentido."""
+    static = _bus_static()
+    monday = dt.datetime(2026, 10, 26, 6, 30).astimezone()  # lunes
+    departures = gtfs.scheduled_departures(
+        static, static.stops["290"], route_id="3613", direction="0", now=monday, limit=3
+    )
+    assert [d["trip_id"] for d in departures] == ["bus1"]
+    assert departures[0]["in_minutes"] == 30
+    assert departures[0]["line"] == "A3613"
+
+    # un domingo sin servicio no devuelve nada
+    static.services["LAB"] = gtfs.Service(
+        days=frozenset({0}),  # solo lunes
+        start=dt.date(2020, 1, 1),
+        end=dt.date(2030, 12, 31),
+    )
+    sunday = dt.datetime(2026, 11, 1, 6, 30).astimezone()
+    assert (
+        gtfs.scheduled_departures(
+            static, static.stops["290"], route_id="3613", direction="0", now=sunday
+        )
+        == []
+    )
+
+
+def test_departures_for_cae_al_horario_si_no_hay_tiempo_real() -> None:
+    """Sin datos en tiempo real se usa el horario; con datos, mandan los reales."""
+    static = _bus_static()
+    now = dt.datetime(2026, 10, 26, 6, 30).astimezone()
+    departures, source = gtfs.departures_for(
+        static, [], static.stops["290"], "3613|0", now=now.timestamp()
+    )
+    assert source == "schedule"
+    assert departures[0]["line"] == "A3613"
+
+    realtime = [
+        {
+            "trip_id": "bus1",
+            "stop_time_updates": [
+                {"stop_id": "290", "departure": {"time": int(now.timestamp()) + 120}}
+            ],
+        }
+    ]
+    departures, source = gtfs.departures_for(
+        static, realtime, static.stops["290"], "3613|0", now=now.timestamp()
+    )
+    assert source == "realtime"
+    assert departures[0]["in_minutes"] == 2
 
 
 def test_linea_se_deriva_del_origen_y_del_destino() -> None:

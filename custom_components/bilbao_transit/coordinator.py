@@ -1,8 +1,7 @@
-"""Coordinador de datos: feed en tiempo real + caché del horario estático."""
+"""Coordinador de datos: feed en tiempo real + horario estático."""
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from datetime import timedelta
@@ -12,22 +11,33 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_NETWORK, DEFAULT_SCAN_INTERVAL, DOMAIN, NETWORKS, STATIC_TTL
+from .const import (
+    CONF_NETWORK,
+    CONF_STOP_IDS,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    NETWORKS,
+)
 from .gtfs import StaticFeed, fetch_realtime, load_static
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class BilbaoTransitCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Descarga el GTFS-RT de la red y mantiene cacheado el horario estático."""
+    """Descarga el GTFS-RT de la red y mantiene el horario estático cacheado."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.network: str = entry.data[CONF_NETWORK]
+        self.stop_ids: list[str] | None = entry.data.get(CONF_STOP_IDS) or None
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN} {self.network}",
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(
+                seconds=DEFAULT_SCAN_INTERVAL
+                if not NETWORKS[self.network].get("schedule_only")
+                else 300
+            ),
         )
 
     @property
@@ -35,47 +45,36 @@ class BilbaoTransitCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Horario estático cargado en el último refresh."""
         return self.data["static"]
 
-    async def _async_static(self) -> StaticFeed:
-        """Horario estático cacheado en memoria, compartido entre entradas."""
-        domain_data = self.hass.data.setdefault(DOMAIN, {})
-        cache: dict[str, StaticFeed] = domain_data.setdefault("static", {})
-        locks: dict[str, asyncio.Lock] = domain_data.setdefault("locks", {})
-
-        cached = cache.get(self.network)
-        if cached is not None and time.time() - cached.fetched_at < STATIC_TTL:
-            return cached
-
-        lock = locks.setdefault(self.network, asyncio.Lock())
-        async with lock:
-            cached = cache.get(self.network)
-            if cached is not None and time.time() - cached.fetched_at < STATIC_TTL:
-                return cached
-            try:
-                feed = await self.hass.async_add_executor_job(load_static, self.network)
-            except Exception as err:  # noqa: BLE001 - cualquier fallo de red/parseo
-                if cached is not None:
-                    _LOGGER.warning(
-                        "No se pudo actualizar el horario de %s, uso el cacheado: %s",
-                        NETWORKS[self.network]["name"],
-                        err,
-                    )
-                    return cached
-                raise UpdateFailed(
-                    f"No se pudo descargar el horario de {NETWORKS[self.network]['name']}: {err}"
-                ) from err
-            cache[self.network] = feed
-            return feed
+    @property
+    def schedule_only(self) -> bool:
+        """True si la red no publica estimaciones en tiempo real."""
+        return bool(NETWORKS[self.network].get("schedule_only"))
 
     async def _async_update_data(self) -> dict[str, Any]:
-        static = await self._async_static()
         try:
-            feed_timestamp, updates = await self.hass.async_add_executor_job(
-                fetch_realtime, self.network
+            static = await self.hass.async_add_executor_job(
+                load_static, self.network, self.stop_ids
             )
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:  # noqa: BLE001 - cualquier fallo de red/parseo
             raise UpdateFailed(
-                f"Error leyendo el tiempo real de {NETWORKS[self.network]['name']}: {err}"
+                f"No se pudo cargar el horario de {NETWORKS[self.network]['name']}: {err}"
             ) from err
+
+        feed_timestamp: int | None = None
+        updates: list[dict[str, Any]] = []
+        if not self.schedule_only:
+            try:
+                feed_timestamp, updates = await self.hass.async_add_executor_job(
+                    fetch_realtime, self.network
+                )
+            except Exception as err:  # noqa: BLE001
+                # El tiempo real es un extra: si falla, seguimos con el horario.
+                _LOGGER.warning(
+                    "Tiempo real de %s no disponible, uso el horario programado: %s",
+                    NETWORKS[self.network]["name"],
+                    err,
+                )
+
         return {
             "static": static,
             "feed_timestamp": feed_timestamp,

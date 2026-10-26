@@ -3,21 +3,28 @@
     "step": {
       "user": {
         "title": "Bilbao Transit",
-        "description": "Choose the transit network to add.",
+        "description": "Choose the transit network to add: metro, tram, Bizkaibus or Bilbobus.",
         "data": {
           "network": "Network"
         }
       },
       "stop": {
         "title": "Choose the stop",
-        "description": "{network} stops sorted by distance from your Home Assistant location.",
+        "description": "{network} stops sorted by distance from your Home Assistant location. The first one is the closest.",
         "data": {
           "stop_id": "Stop"
         }
       },
+      "lines": {
+        "title": "Choose the lines",
+        "description": "Lines that stop at {stop}. One sensor is created per line and direction.",
+        "data": {
+          "lines": "Lines"
+        }
+      },
       "directions": {
         "title": "Choose the directions",
-        "description": "Directions available at {stop}. One sensor is created per direction.",
+        "description": "Options available at {stop}. One sensor is created per selected option.",
         "data": {
           "directions": "Directions"
         }
@@ -28,7 +35,9 @@
     },
     "abort": {
       "already_configured": "That stop is already configured.",
-      "stop_not_found": "The stop no longer exists in the official timetable."
+      "stop_not_found": "The stop no longer exists in the official timetable.",
+      "no_lines": "No line stops at that stop in the official timetable.",
+      "no_directions": "No direction available at that stop."
     }
   },
   "options": {

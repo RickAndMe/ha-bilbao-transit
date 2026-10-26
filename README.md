@@ -1,17 +1,31 @@
 # Bilbao Transit para Home Assistant
 
-Próximas salidas **en tiempo real** del **Metro Bilbao** y del **tranvía de Bilbao**
-(Euskotren Tranbia) como sensores nativos de Home Assistant.
+Próximas salidas del **Metro Bilbao**, el **tranvía de Bilbao** (Euskotren Tranbia),
+**Bizkaibus** y **Bilbobus** como sensores nativos de Home Assistant.
 
-Un sensor = una parada + un sentido. El estado es **los minutos que faltan** para
-la próxima salida; los atributos llevan las siguientes salidas, el destino y la
-hora exacta de paso.
+Un sensor = una parada + un sentido (y, en los buses, una línea). El estado es **los
+minutos que faltan** para la próxima salida; los atributos llevan las siguientes salidas,
+el destino final, la línea y la hora exacta de paso.
 
 ```
-sensor.bolueta_metro_a_kabiezes        3   → destino: Kabiezes, 09:45
-sensor.bolueta_metro_a_basauri         4
-sensor.bolueta_tranvia_a_la_casilla    6
+sensor.bolueta_metro_bilbao_hacia_bilbao_norte           3   → L2 Kabiezes 09:45
+sensor.bolueta_metro_bilbao_hacia_basauri_etxarri_sur    4   → L1 Etxebarri 09:46
+sensor.bolueta_euskotren_tranvia_bilbao_hacia_la_casilla 6
+sensor.metro_bolueta_bizkaibus_a3613_ugao_miraballes     8   → A3613 OROZKO 09:50
 ```
+
+## Redes y calidad del dato
+
+| Red | Horario oficial | Tiempo real | Notas |
+| --- | --- | --- | --- |
+| Metro Bilbao | sí | **sí** (estimaciones) | el feed no trae sentido ni línea: se deducen del horario |
+| Euskotren Tranvía | sí | **sí** (estimaciones) | el feed sí distingue andén |
+| Bizkaibus | sí | **sí, pero parcial** | el feed solo publica la **próxima parada** de cada bus, así que verás el que está llegando; el resto sale del horario |
+| Bilbobus | sí | **no** | solo publica posiciones de vehículos (a menudo vacías). Va con horario programado y el sensor lo indica (`service_status: horario (sin tiempo real)`) |
+
+Cuando hay dato real, el sensor se marca `ok` y usa la estimación oficial. Si no, cae al
+horario programado y lo dice en `data_source` (`realtime` / `schedule`) para que nunca
+confundas una cosa con la otra.
 
 ## Instalación
 
@@ -30,14 +44,20 @@ y reinicia Home Assistant.
 
 **Ajustes → Dispositivos y servicios → Añadir integración → Bilbao Transit**
 
-1. Elige la red: *Metro Bilbao* o *Euskotren Tranvía Bilbao*.
+1. Elige la red: *Metro Bilbao*, *Euskotren Tranvía Bilbao*, *Bizkaibus* o *Bilbobus*.
 2. Elige la parada: la lista viene **ordenada por distancia** a la ubicación
-   configurada en Home Assistant (la de `zone.home` / Ajustes → General).
-3. Marca los sentidos que quieres. Cada uno genera un sensor.
+   configurada en Home Assistant (la de `zone.home` / Ajustes → General); la primera
+   es la más cercana.
+3. **En los buses**, elige las líneas que paran ahí (varias a la vez si quieres).
+4. Marca los sentidos que quieres. Cada uno genera un sensor.
 
 Repite el proceso para añadir más paradas (por ejemplo metro y tranvía de la misma
 estación). Los sentidos y el nombre de las entidades se pueden cambiar después
 con **Configurar** en la tarjeta de la integración, o renombrando la entidad.
+
+Ojo con los buses: en Bizkaibus y Bilbobus cada sentido de la calle suele ser una
+parada distinta en el GTFS (p. ej. *METRO BOLUETA (290)* y *(285)*), así que para tener
+los dos sentidos hay que dar de alta las dos paradas.
 
 ## Entidades
 
@@ -57,25 +77,22 @@ El horario estático se descarga una vez cada 12 h y se cachea en memoria.
 
 ## Tarjeta con las 3 próximas salidas
 
-El estado del sensor es solo el próximo tren; los siguientes van en el atributo
-`next_departures`. Esta tarjeta pinta las **3 próximas** de cada sentido, con hora, línea,
-destino y minutos:
+El estado del sensor es solo el próximo bus/tren; los siguientes van en el atributo
+`next_departures`. Esta tarjeta **descubre sola todas las entidades de la integración**
+(así los buses que añadas después aparecen sin tocar nada) y pinta las 3 próximas de
+cada una, con hora, línea, destino y minutos:
 
 ```yaml
 type: markdown
 title: Bolueta
 content: |
-  {%- set filas = [
-    ('🚇 Hacia Bilbao', 'sensor.bolueta_metro_bilbao_hacia_bilbao_norte'),
-    ('🚇 Hacia Basauri/Etxarri', 'sensor.bolueta_metro_bilbao_hacia_basauri_etxarri_sur'),
-    ('🚉 Hacia La Casilla', 'sensor.bolueta_euskotren_tranvia_bilbao_hacia_la_casilla'),
-    ('🚉 Hacia Bolueta', 'sensor.bolueta_euskotren_tranvia_bilbao_hacia_bolueta'),
-  ] -%}
-  {%- for titulo, entidad in filas %}
-  {%- set salidas = (state_attr(entidad, 'next_departures') or [])[:3] %}
+  {%- set entidades = states.sensor | selectattr('attributes.network', 'defined')
+       | selectattr('attributes.next_departures', 'defined') | list -%}
+  {%- for e in entidades | sort(attribute='attributes.stop_name') %}
+  {%- set salidas = (e.attributes.next_departures or [])[:3] %}
   {%- if salidas %}
 
-  **{{ titulo }}**
+  **{{ e.name }}**
   {% for s in salidas -%}
   · {{ s.departure }} · {{ s.line ~ ' ' if s.line }}{{ s.destination or s.headsign }} — **{{ s.minutes }} min**
   {% endfor %}
@@ -101,6 +118,12 @@ con cada sensor.
   intermedia, del destino final.
 - No hay dependencias externas: el protobuf de GTFS-RT se decodifica con un
   parser propio de ~100 líneas.
+- El GTFS de Bizkaibus tiene 35 MB de `stop_times`: la integración **solo guarda las
+  paradas que has dado de alta** (unos 35 MB de lectura, ~35 MB de pico de memoria), y
+  cachea el zip descargado media hora para no bajarlo dos veces en el mismo alta.
+- El horario programado (respaldo de todas las redes y única fuente en Bilbobus) se
+  calcula con `calendar.txt`/`calendar_dates.txt`, así que respeta laborables, sábados,
+  domingos y festivos.
 - El feed en tiempo real solo publica los trenes próximos (30-40 min de vista).
   Fuera de ese margen, o cuando no hay servicio (noche), el sensor queda en
   `unknown` con `service_status: sin servicio`.

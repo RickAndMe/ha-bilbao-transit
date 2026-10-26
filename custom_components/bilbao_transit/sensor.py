@@ -24,9 +24,15 @@ from .const import (
     NETWORKS,
 )
 from .coordinator import BilbaoTransitCoordinator
-from .gtfs import Stop, upcoming_departures
+from .gtfs import Stop, departures_for, split_key
 
 _LOGGER = logging.getLogger(__name__)
+
+STATUS_BY_SOURCE = {
+    "realtime": "ok",
+    "schedule": "horario (sin tiempo real)",
+    "none": "sin servicio",
+}
 
 
 async def async_setup_entry(
@@ -34,7 +40,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Crea un sensor por sentido de la parada configurada."""
+    """Crea un sensor por línea y sentido de la parada configurada."""
     coordinator: BilbaoTransitCoordinator = hass.data[DOMAIN][entry.entry_id]
     stop: Stop | None = coordinator.static.stops.get(entry.data[CONF_STOP_ID])
     if stop is None:
@@ -49,22 +55,24 @@ async def async_setup_entry(
         CONF_DIRECTIONS, entry.data.get(CONF_DIRECTIONS, [])
     )
     labels: dict[str, str] = entry.data.get(CONF_DIRECTION_LABELS, {})
+    multi_line = bool(NETWORKS[coordinator.network].get("multi_line"))
 
     entities = [
         TransitDepartureSensor(
             coordinator=coordinator,
             entry=entry,
             stop=stop,
-            direction=direction,
-            label=labels.get(direction) or f"sentido {direction}",
+            key=key,
+            label=labels.get(key) or f"sentido {key}",
+            multi_line=multi_line,
         )
-        for direction in directions
+        for key in directions
     ]
     async_add_entities(entities)
 
 
 class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], SensorEntity):
-    """Minutos que faltan para la próxima salida en un sentido concreto."""
+    """Minutos que faltan para la próxima salida de una línea y sentido."""
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -76,21 +84,24 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
         coordinator: BilbaoTransitCoordinator,
         entry: ConfigEntry,
         stop: Stop,
-        direction: str,
+        key: str,
         label: str,
+        multi_line: bool = False,
     ) -> None:
         super().__init__(coordinator)
         self._stop = stop
-        self._direction = direction
+        self._key = key
+        self._route_id, self._direction = split_key(key)
         network = NETWORKS[coordinator.network]
         self._network_name = network["name"]
-        self._attr_name = f"hacia {label}"
-        self._attr_unique_id = f"{coordinator.network}:{stop.stop_id}:{direction}"
+        # En los buses la etiqueta ya incluye la línea ("A2610 · BILBAO").
+        self._attr_name = label if multi_line else f"hacia {label}"
+        self._attr_unique_id = f"{coordinator.network}:{stop.stop_id}:{key}"
         self._attr_icon = network["icon"]
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{coordinator.network}:{stop.stop_id}")},
             name=f"{stop.name} ({network['name']})",
-            manufacturer="CTB / Euskotren",
+            manufacturer=network.get("manufacturer", "CTB / Euskotren / Bizkaibus"),
             model=network["name"],
             entry_type=DeviceEntryType.SERVICE,
             suggested_area=None,
@@ -98,30 +109,33 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
         self._entry_id = entry.entry_id
 
     @property
-    def _departures(self) -> list[dict[str, Any]]:
-        return upcoming_departures(
+    def _departures(self) -> tuple[list[dict[str, Any]], str]:
+        return departures_for(
             self.coordinator.static,
             self.coordinator.data.get("updates") or [],
             self._stop,
-            self._direction,
+            self._key,
             limit=MAX_DEPARTURES,
         )
 
     @property
     def native_value(self) -> int | None:
-        departures = self._departures
+        departures, _ = self._departures
         return departures[0]["in_minutes"] if departures else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        departures = self._departures
+        departures, source = self._departures
         feed_timestamp = self.coordinator.data.get("feed_timestamp")
         attributes: dict[str, Any] = {
             "stop_id": self._stop.stop_id,
             "stop_name": self._stop.name,
             "network": self._network_name,
+            "line": departures[0]["line"] if departures else None,
+            "route_id": self._route_id or None,
             "direction": self._direction,
-            "service_status": "ok" if departures else "sin servicio",
+            "service_status": STATUS_BY_SOURCE.get(source, source),
+            "data_source": source,
             "next_departures": [
                 {
                     "departure": dt_util.as_local(

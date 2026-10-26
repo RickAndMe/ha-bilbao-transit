@@ -7,8 +7,10 @@ DOMAIN = "bilbao_transit"
 CONF_NETWORK = "network"
 CONF_STOP_ID = "stop_id"
 CONF_STOP_NAME = "stop_name"
+CONF_STOP_IDS = "stop_ids"
 CONF_DIRECTIONS = "directions"
 CONF_DIRECTION_LABELS = "direction_labels"
+CONF_LINES = "lines"
 CONF_MAX_DEPARTURES = "max_departures"
 
 DEFAULT_SCAN_INTERVAL = 45  # segundos
@@ -46,6 +48,8 @@ NETWORKS: dict[str, dict] = {
             },
             "L2": {"Basauri", "Kabiezes"},
         },
+        "multi_line": False,
+        "schedule_only": False,
     },
     "tram": {
         "name": "Euskotren Tranvía Bilbao",
@@ -62,5 +66,41 @@ NETWORKS: dict[str, dict] = {
         "icon": "mdi:tram",
         "direction_labels": None,
         "line_terminals": None,
+        "multi_line": False,
+        "schedule_only": False,
+    },
+    "bizkaibus": {
+        "name": "Bizkaibus",
+        "gtfs_url": (
+            "https://opendata.euskadi.eus/transport/moveuskadi/bizkaibus/"
+            "gtfs_bizkaibus.zip"
+        ),
+        "rt_url": (
+            "https://opendata.euskadi.eus/transport/moveuskadi/bizkaibus/"
+            "gtfsrt_bizkaibus_trip_updates.pb"
+        ),
+        "agency_filter": None,
+        "icon": "mdi:bus",
+        "direction_labels": None,
+        "line_terminals": None,
+        # Varias líneas por parada: hay que elegir línea y sentido.
+        "multi_line": True,
+        "schedule_only": False,
+    },
+    "bilbobus": {
+        "name": "Bilbobus",
+        "gtfs_url": (
+            "https://opendata.euskadi.eus/transport/moveuskadi/bilbobus/"
+            "gtfs_bilbobus.zip"
+        ),
+        # Bilbobus no publica estimaciones de llegada, solo posiciones de
+        # vehículos (y a menudo vacías), así que se usa el horario programado.
+        "rt_url": None,
+        "agency_filter": None,
+        "icon": "mdi:bus-side",
+        "direction_labels": None,
+        "line_terminals": None,
+        "multi_line": True,
+        "schedule_only": True,
     },
 }
