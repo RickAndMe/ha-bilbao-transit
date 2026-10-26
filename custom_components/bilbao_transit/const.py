@@ -27,7 +27,25 @@ NETWORKS: dict[str, dict] = {
         ),
         "agency_filter": None,
         "icon": "mdi:train-variant",
-        "stop_prefix": "",
+        # El GTFS solo publica una ruta ("MB"): el sentido es global
+        # (0 = norte hacia Bilbao, 1 = sur) y se etiqueta por su significado real,
+        # porque cada tren puede terminar en un destino distinto.
+        "direction_labels": {"0": "Bilbao (norte)", "1": "Basauri/Etxarri (sur)"},
+        # Línea deducida del origen del viaje: L1 arranca en Etxebarri y L2 en Basauri.
+        # Los extremos cortos (Bidezabal, Sopela, Larrabasterra...) son de la L1;
+        # Kabiezes y Basauri son de la L2.
+        "line_terminals": {
+            "L1": {
+                "Etxebarri",
+                "Plentzia",
+                "Ibarbengoa",
+                "Larrabasterra",
+                "Sopela",
+                "Bidezabal",
+                "Urduliz",
+            },
+            "L2": {"Basauri", "Kabiezes"},
+        },
     },
     "tram": {
         "name": "Euskotren Tranvía Bilbao",
@@ -42,6 +60,7 @@ NETWORKS: dict[str, dict] = {
         # Solo las líneas del tranvía de Bilbao dentro del feed de Euskotren
         "agency_filter": "ES:Euskotren:Operator:EUS_TrBi:",
         "icon": "mdi:tram",
-        "stop_prefix": "",
+        "direction_labels": None,
+        "line_terminals": None,
     },
 }

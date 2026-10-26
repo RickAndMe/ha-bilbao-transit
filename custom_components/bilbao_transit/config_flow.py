@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 class BilbaoTransitConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Alta de una parada."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         self._network: str | None = None

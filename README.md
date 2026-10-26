@@ -43,34 +43,48 @@ con **Configurar** en la tarjeta de la integración, o renombrando la entidad.
 
 | Entidad | Estado | Atributos principales |
 | --- | --- | --- |
-| `sensor.<parada>_a_<destino>` | minutos al próximo (o `unknown` si no hay servicio) | `next_departures` (hora, minutos, destino), `destination`, `service_status`, `feed_updated` |
+| `sensor.<parada>_hacia_<sentido>` | minutos al próximo (o `unknown` si no hay servicio) | `next_departures` (hora, minutos, destino y línea de cada salida), `destination`, `service_status`, `feed_updated` |
+
+**Los sentidos se nombran por su significado, no por un destino concreto.** En Metro
+Bilbao un tren hacia el norte puede terminar en Kabiezes (L2) o en Plentzia, Bidezabal,
+Sopela, Urduliz, Larrabasterra, Ibarbengoa, San Ignazio (L1), así que el sensor se llama
+*hacia Bilbao (norte)* y **cada salida lleva su destino final y su línea**. La línea se
+deduce del origen del viaje en el horario oficial: la L1 sale de Etxebarri y la L2 de
+Basauri.
 
 Actualización: cada 45 segundos (el feed oficial se refresca cada ~30 s).
 El horario estático se descarga una vez cada 12 h y se cachea en memoria.
 
-## Ejemplo de tarjeta
+## Tarjeta con las 3 próximas salidas
 
-```yaml
-type: entities
-title: Bolueta
-entities:
-  - entity: sensor.bolueta_metro_a_kabiezes
-    name: Metro a Bilbao
-  - entity: sensor.bolueta_metro_a_basauri
-    name: Metro a Basauri
-  - entity: sensor.bolueta_tranvia_a_la_casilla
-    name: Tranvía al centro
-```
-
-Para ver las siguientes salidas en una tarjeta, usa el atributo:
+El estado del sensor es solo el próximo tren; los siguientes van en el atributo
+`next_departures`. Esta tarjeta pinta las **3 próximas** de cada sentido, con hora, línea,
+destino y minutos:
 
 ```yaml
 type: markdown
-content: >
-  {% set d = state_attr('sensor.bolueta_metro_a_kabiezes', 'next_departures') %}
-  {% for dep in d %}{{ dep.departure }} · {{ dep.headsign }} · {{ dep.minutes }} min
+title: Bolueta
+content: |
+  {%- set filas = [
+    ('🚇 Hacia Bilbao', 'sensor.bolueta_metro_bilbao_hacia_bilbao_norte'),
+    ('🚇 Hacia Basauri/Etxarri', 'sensor.bolueta_metro_bilbao_hacia_basauri_etxarri_sur'),
+    ('🚉 Hacia La Casilla', 'sensor.bolueta_euskotren_tranvia_bilbao_hacia_la_casilla'),
+    ('🚉 Hacia Bolueta', 'sensor.bolueta_euskotren_tranvia_bilbao_hacia_bolueta'),
+  ] -%}
+  {%- for titulo, entidad in filas %}
+  {%- set salidas = (state_attr(entidad, 'next_departures') or [])[:3] %}
+  {%- if salidas %}
+
+  **{{ titulo }}**
+  {% for s in salidas -%}
+  · {{ s.departure }} · {{ s.line ~ ' ' if s.line }}{% if s.destination %}{{ s.destination }}{% endif %} — **{{ s.minutes }} min**
   {% endfor %}
+  {%- endif %}
+  {%- endfor %}
 ```
+
+Si prefieres una lista clásica de entidades (solo el próximo), sirve `type: entities`
+con cada sensor.
 
 ## Cómo funciona (y límites)
 
@@ -82,6 +96,9 @@ content: >
 - El feed GTFS-RT del metro **no incluye la dirección** del viaje: la integración
   cruza cada `trip_id` en tiempo real con el horario estático para conocer
   destino y sentido. Sin ese cruce, un sensor por parada mezclaría ambos andenes.
+- La línea (L1/L2) tampoco viene en el feed: se deduce del **origen** del viaje en el
+  horario estático (Basauri ⇒ L2, Etxebarri ⇒ L1) y, si el origen es una estación
+  intermedia, del destino final.
 - No hay dependencias externas: el protobuf de GTFS-RT se decodifica con un
   parser propio de ~100 líneas.
 - El feed en tiempo real solo publica los trenes próximos (30-40 min de vista).

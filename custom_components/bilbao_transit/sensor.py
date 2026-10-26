@@ -84,7 +84,7 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
         self._direction = direction
         network = NETWORKS[coordinator.network]
         self._network_name = network["name"]
-        self._attr_name = f"a {label}"
+        self._attr_name = f"hacia {label}"
         self._attr_unique_id = f"{coordinator.network}:{stop.stop_id}:{direction}"
         self._attr_icon = network["icon"]
         self._attr_device_info = DeviceInfo(
@@ -128,7 +128,8 @@ class TransitDepartureSensor(CoordinatorEntity[BilbaoTransitCoordinator], Sensor
                         dt_util.utc_from_timestamp(item["timestamp"])
                     ).strftime("%H:%M"),
                     "minutes": item["in_minutes"],
-                    "headsign": item["headsign"],
+                    "destination": item["destination"],
+                    "line": item["line"],
                     "trip_id": item["trip_id"],
                 }
                 for item in departures

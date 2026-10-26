@@ -90,8 +90,12 @@ def _static() -> gtfs.StaticFeed:
         network="metro",
         stops={"3": stop},
         trip_meta={
-            "north": ("0", "Kabiezes"),
-            "south": ("1", "Basauri"),
+            "north": gtfs.TripMeta(
+                direction="0", headsign="Kabiezes", line="L2", origin="Basauri"
+            ),
+            "south": gtfs.TripMeta(
+                direction="1", headsign="Basauri", line="L2", origin="Kabiezes"
+            ),
         },
         stop_trips={"3.0": {"north", "south"}},
         fetched_at=0.0,
@@ -141,8 +145,52 @@ def test_haversine_metros() -> None:
     assert 50 < distance < 200
 
 
-def test_directions_devuelve_destino_dominante() -> None:
+def test_directions_usa_etiquetas_de_la_red() -> None:
+    """En metro el sentido se llama por su significado, no por el destino."""
     static = _static()
-    static.trip_meta["north2"] = ("0", "Kabiezes")
+    assert static.directions(static.stops["3"]) == {
+        "0": "Bilbao (norte)",
+        "1": "Basauri/Etxarri (sur)",
+    }
+
+
+def test_directions_sin_etiquetas_fijas_usa_destino_dominante() -> None:
+    """En el tranvía la etiqueta sale del destino más frecuente."""
+    static = _static()
+    static.network = "tram"
+    static.trip_meta["north2"] = gtfs.TripMeta(direction="0", headsign="Kabiezes")
     static.stop_trips["3.0"].add("north2")
     assert static.directions(static.stops["3"]) == {"0": "Kabiezes", "1": "Basauri"}
+
+
+def test_linea_se_deriva_del_origen_y_del_destino() -> None:
+    """La L1 sale de Etxebarri y la L2 de Basauri; el destino es el respaldo."""
+    terminals = {
+        "L1": {"Etxebarri", "Plentzia", "Bidezabal"},
+        "L2": {"Basauri", "Kabiezes"},
+    }
+    assert gtfs._derive_line(terminals, "Basauri", "Kabiezes") == "L2"
+    assert gtfs._derive_line(terminals, "Etxebarri", "Plentzia") == "L1"
+    # un servicio L1 que acaba en Kabiezes sigue siendo L1: manda el origen
+    assert gtfs._derive_line(terminals, "Etxebarri", "Kabiezes") == "L1"
+    # origen intermedio (San Mamés): se resuelve por el destino
+    assert gtfs._derive_line(terminals, "San Mamés", "Basauri") == "L2"
+    assert gtfs._derive_line(terminals, "San Mamés", "Bidezabal") == "L1"
+    assert gtfs._derive_line(terminals, "San Mamés", "Rara") is None
+
+
+def test_upcoming_incluye_destino_y_linea() -> None:
+    static = _static()
+    now = 1_700_000_000
+    updates = [
+        {
+            "trip_id": "north",
+            "stop_time_updates": [{"stop_id": "3.0", "departure": {"time": now + 120}}],
+        }
+    ]
+    departure = gtfs.upcoming_departures(
+        static, updates, static.stops["3"], "0", now=now
+    )[0]
+    assert departure["destination"] == "Kabiezes"
+    assert departure["line"] == "L2"
+    assert departure["origin"] == "Basauri"

@@ -39,30 +39,51 @@ class Stop:
 
 
 @dataclass(slots=True)
+class TripMeta:
+    """Datos de un viaje que no vienen en el feed en tiempo real."""
+
+    direction: str
+    headsign: str
+    line: str | None = None
+    origin: str | None = None
+    terminus: str | None = None
+
+
+@dataclass(slots=True)
 class StaticFeed:
     """Horario estático ya reducido a lo que usa la integración."""
 
     network: str
     stops: dict[str, Stop] = field(default_factory=dict)
-    trip_meta: dict[str, tuple[str, str]] = field(default_factory=dict)
+    trip_meta: dict[str, TripMeta] = field(default_factory=dict)
     stop_trips: dict[str, set[str]] = field(default_factory=dict)
     fetched_at: float = 0.0
 
     def directions(self, stop: Stop) -> dict[str, str]:
-        """Devuelve {direction_id: etiqueta} de una parada, por destino dominante."""
+        """Devuelve {direction_id: etiqueta} de una parada.
+
+        Se prefieren las etiquetas fijas de la red (p. ej. "Bilbao (norte)" en
+        Metro Bilbao, porque cada tren puede acabar en un destino distinto) y,
+        si la red no las define, el destino más frecuente en esa parada.
+        """
         counts: dict[str, dict[str, int]] = {}
         for stop_id in stop.stop_ids:
             for trip_id in self.stop_trips.get(stop_id, ()):  # noqa: B007
                 meta = self.trip_meta.get(trip_id)
                 if not meta:
                     continue
-                direction, headsign = meta
-                counts.setdefault(direction, {})
-                counts[direction][headsign] = counts[direction].get(headsign, 0) + 1
+                counts.setdefault(meta.direction, {})
+                counts[meta.direction][meta.headsign] = (
+                    counts[meta.direction].get(meta.headsign, 0) + 1
+                )
+
+        fixed = NETWORKS[self.network].get("direction_labels") or {}
         labels: dict[str, str] = {}
         for direction, headsigns in counts.items():
-            top = max(headsigns.items(), key=lambda item: item[1])[0]
-            labels[direction] = top
+            if direction in fixed:
+                labels[direction] = fixed[direction]
+            else:
+                labels[direction] = max(headsigns.items(), key=lambda item: item[1])[0]
         return labels
 
 
@@ -105,12 +126,35 @@ def _rows(zf: zipfile.ZipFile, name: str) -> list[dict[str, str]]:
 # --- horario estático --------------------------------------------------------
 
 
+def _derive_line(
+    terminals: dict[str, set[str]], origin: str | None, terminus: str | None
+) -> str | None:
+    """Deduce la línea por los extremos del viaje.
+
+    Manda el origen: la L1 sale de Etxebarri y la L2 de Basauri, aunque los
+    destinos se crucen en servicios puntuales.
+    """
+    for line, names in terminals.items():
+        if origin in names:
+            return line
+    for line, names in terminals.items():
+        if terminus in names:
+            return line
+    return None
+
+
 def parse_static(network: str, raw: bytes) -> StaticFeed:
     """Convierte el zip GTFS de la red en un StaticFeed reducido."""
     config = NETWORKS[network]
     feed = StaticFeed(network=network, fetched_at=time.time())
 
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        all_stops = _rows(zf, "stops.txt")
+        name_by_id = {
+            (row.get("stop_id") or "").strip(): (row.get("stop_name") or "").strip()
+            for row in all_stops
+        }
+
         routes = _rows(zf, "routes.txt")
         agency_filter = config.get("agency_filter")
         if agency_filter:
@@ -122,32 +166,52 @@ def parse_static(network: str, raw: bytes) -> StaticFeed:
         else:
             route_ids = {row["route_id"] for row in routes}
 
-        trip_meta: dict[str, tuple[str, str]] = {}
+        trip_meta: dict[str, TripMeta] = {}
         for row in _rows(zf, "trips.txt"):
             if route_ids and (row.get("route_id") or "").strip() not in route_ids:
                 continue
-            trip_meta[(row.get("trip_id") or "").strip()] = (
-                (row.get("direction_id") or "0").strip(),
-                (row.get("trip_headsign") or "").strip(),
+            trip_meta[(row.get("trip_id") or "").strip()] = TripMeta(
+                direction=(row.get("direction_id") or "0").strip(),
+                headsign=(row.get("trip_headsign") or "").strip(),
             )
-        feed.trip_meta = trip_meta
 
         stop_trips: dict[str, set[str]] = {}
+        first_stop: dict[str, tuple[int, str]] = {}
+        last_stop: dict[str, tuple[int, str]] = {}
         for row in _rows(zf, "stop_times.txt"):
             trip_id = (row.get("trip_id") or "").strip()
             if trip_id not in trip_meta:
                 continue
             stop_id = (row.get("stop_id") or "").strip()
             stop_trips.setdefault(stop_id, set()).add(trip_id)
+
+            try:
+                sequence = int((row.get("stop_sequence") or "0").strip())
+            except ValueError:
+                sequence = 0
+            current = first_stop.get(trip_id)
+            if current is None or sequence < current[0]:
+                first_stop[trip_id] = (sequence, stop_id)
+            current = last_stop.get(trip_id)
+            if current is None or sequence > current[0]:
+                last_stop[trip_id] = (sequence, stop_id)
         feed.stop_trips = stop_trips
+
+        # Origen, destino final y línea de cada viaje
+        line_terminals = config.get("line_terminals")
+        for trip_id, meta in trip_meta.items():
+            meta.origin = name_by_id.get(first_stop.get(trip_id, (0, ""))[1])
+            meta.terminus = name_by_id.get(last_stop.get(trip_id, (0, ""))[1])
+            if line_terminals:
+                meta.line = _derive_line(line_terminals, meta.origin, meta.terminus)
+        feed.trip_meta = trip_meta
 
         # Agrupa plataformas/andenes en paradas lógicas usando parent_station
         raw_stops = [
             row
-            for row in _rows(zf, "stops.txt")
+            for row in all_stops
             if (row.get("location_type") or "0").strip() in ("", "0")
         ]
-        by_id = {(row.get("stop_id") or "").strip(): row for row in raw_stops}
         groups: dict[str, list[dict[str, str]]] = {}
         for row in raw_stops:
             stop_id = (row.get("stop_id") or "").strip()
@@ -216,8 +280,7 @@ def upcoming_departures(
         meta = feed.trip_meta.get(update.get("trip_id") or "")
         if not meta:
             continue
-        trip_direction, headsign = meta
-        if direction is not None and trip_direction != direction:
+        if direction is not None and meta.direction != direction:
             continue
         for stop_time in update.get("stop_time_updates") or ():
             if (stop_time.get("stop_id") or "") not in stop.stop_ids:
@@ -230,8 +293,12 @@ def upcoming_departures(
                 "timestamp": when,
                 "in_seconds": int(when - now),
                 "in_minutes": round((when - now) / 60),
-                "headsign": headsign,
-                "direction": trip_direction,
+                "headsign": meta.headsign,
+                "destination": meta.headsign,
+                "line": meta.line,
+                "origin": meta.origin,
+                "terminus": meta.terminus,
+                "direction": meta.direction,
                 "delay": (stop_time.get("departure") or {}).get("delay"),
             }
     departures = sorted(found.values(), key=lambda item: item["timestamp"])

@@ -66,9 +66,15 @@ def main() -> int:
             when = datetime.fromtimestamp(dep["timestamp"]).strftime("%H:%M:%S")
             sense = "hacia Bilbao" if dep["direction"] == "0" else "hacia el sur"
             print(
-                f"    {when}  {dep['in_minutes']:>3} min  {sense:<14} {dep['headsign']}"
+                f"    {when}  {dep['in_minutes']:>3} min  {sense:<14} "
+                f"{dep['line'] or '--'}  {dep['destination']}"
             )
         check("las horas son futuras", all(d["timestamp"] >= now - 60 for d in departures))
+        check("cada salida trae línea", all(d["line"] for d in departures))
+        check(
+            "cada salida trae destino",
+            all(d["destination"] for d in departures),
+        )
 
     print("== Euskotren Tranvía Bilbao (GTFS estático) ==")
     tram = load_static("tram")
