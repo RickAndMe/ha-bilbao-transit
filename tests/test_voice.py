@@ -209,3 +209,23 @@ async def test_tarjeta_se_sirve_por_http(hass: HomeAssistant, monkeypatch) -> No
     # una segunda llamada no duplica el recurso
     await integracion._async_register_card(hass)
     assert urls == [integracion.CARD_URL]
+
+
+@pytest.mark.asyncio
+async def test_la_direccion_no_repite_la_linea(hass: HomeAssistant) -> None:
+    """'A3613 · BILBAO' se dice como 'BILBAO', no dos veces la línea."""
+    _estado(
+        hass,
+        "sensor.bus",
+        5,
+        network_key="bizkaibus",
+        network="Bizkaibus",
+        direction_label="A3613 · BILBAO",
+        next_departures=[
+            {"minutes": 5, "departure": "18:34", "line": "A3613", "destination": "A3613 · BILBAO", "trip_id": "1"}
+        ],
+    )
+    filas = departures(hass)
+    assert filas[0]["direction"] == "BILBAO"
+    assert filas[0]["destination"] == "BILBAO"
+    assert "A3613" not in describe(filas[0]).split("hacia")[1]

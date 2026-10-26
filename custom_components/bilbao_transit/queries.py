@@ -49,18 +49,30 @@ def red_desde_texto(texto: str | None) -> str | None:
     return None
 
 
+def _sin_linea(texto: str | None, linea: str | None) -> str:
+    """'A3613 · BILBAO' + línea A3613 -> 'BILBAO' (sin repetir la línea al hablar)."""
+    if not texto:
+        return ""
+    if linea and texto.startswith(linea):
+        limpio = texto[len(linea) :].lstrip(" ·-").strip()
+        return limpio or texto
+    return texto
+
+
 def _salida(estado: State, salida: dict[str, Any]) -> dict[str, Any]:
     atributos = estado.attributes
+    linea = salida.get("line")
+    direccion = _sin_linea(atributos.get("direction_label"), linea)
     return {
         "entity_id": estado.entity_id,
         "network_key": atributos.get("network_key"),
         "network": TRANSPORTE_POR_RED.get(atributos.get("network_key"), atributos.get("network")),
         "stop_name": atributos.get("stop_name"),
-        "direction": atributos.get("direction_label"),
+        "direction": direccion,
         "minutes": salida.get("minutes"),
         "departure": salida.get("departure"),
         "line": salida.get("line"),
-        "destination": salida.get("destination") or atributos.get("direction_label"),
+        "destination": _sin_linea(salida.get("destination"), linea) or direccion,
         "realtime": atributos.get("data_source") == "realtime",
     }
 
