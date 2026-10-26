@@ -18,8 +18,25 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 FRONTEND_KEY = f"{DOMAIN}_frontend"
-CARD_URL = "/bilbao_transit/bilbao-transit-card.js"
+CARD_PATH = "/bilbao_transit/bilbao-transit-card.js"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+
+
+def _version() -> str:
+    """Versión de la integración, para invalidar la caché del navegador."""
+    try:
+        import json
+
+        return json.loads((Path(__file__).parent / "manifest.json").read_text("utf-8"))[
+            "version"
+        ]
+    except (OSError, ValueError, KeyError):
+        return "0"
+
+
+# La URL lleva la versión: si no cambia, los navegadores se quedan con una copia
+# vieja del módulo y la tarjeta deja de cargar sin motivo aparente.
+CARD_URL = f"{CARD_PATH}?v={_version()}"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -113,10 +130,19 @@ async def _async_ensure_lovelace_resource(hass: HomeAssistant) -> None:
         if not recursos.loaded:
             await recursos.async_load()
         existentes = await recursos.async_items()
-        if any(item.get("url") == CARD_URL for item in existentes):
-            return
-        await recursos.async_create_item({"res_type": "module", "url": CARD_URL})
-        _LOGGER.info("Tarjeta registrada como recurso de Lovelace (%s)", CARD_URL)
+        actual = next(
+            (item for item in existentes if str(item.get("url", "")).startswith(CARD_PATH)),
+            None,
+        )
+        if actual is None:
+            await recursos.async_create_item({"res_type": "module", "url": CARD_URL})
+            _LOGGER.info("Tarjeta registrada como recurso de Lovelace (%s)", CARD_URL)
+        elif actual.get("url") != CARD_URL:
+            # versión nueva: se actualiza la URL para que los navegadores la recarguen
+            await recursos.async_update_item(
+                actual["id"], {"res_type": "module", "url": CARD_URL}
+            )
+            _LOGGER.info("Recurso de la tarjeta actualizado a %s", CARD_URL)
     except Exception:  # noqa: BLE001 - nunca debe impedir que arranque la integración
         _LOGGER.exception("No se pudo registrar la tarjeta como recurso de Lovelace")
 
