@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bilbao Transit",
+        "description": "Choose the transit network to add.",
+        "data": {
+          "network": "Network"
+        }
+      },
+      "stop": {
+        "title": "Choose the stop",
+        "description": "{network} stops sorted by distance from your Home Assistant location.",
+        "data": {
+          "stop_id": "Stop"
+        }
+      },
+      "directions": {
+        "title": "Choose the directions",
+        "description": "Directions available at {stop}. One sensor is created per direction.",
+        "data": {
+          "directions": "Directions"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not download the official timetable. Check the internet connection and try again."
+    },
+    "abort": {
+      "already_configured": "That stop is already configured.",
+      "stop_not_found": "The stop no longer exists in the official timetable."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Directions to show",
+        "description": "Select the directions you want as sensors.",
+        "data": {
+          "directions": "Directions"
+        }
+      }
+    },
+    "abort": {
+      "cannot_connect": "Could not download the official timetable.",
+      "stop_not_found": "The stop no longer exists in the official timetable."
+    }
+  }
+}

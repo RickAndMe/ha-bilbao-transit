@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bilbao Transit",
+        "description": "Elige la red de transporte que quieres añadir.",
+        "data": {
+          "network": "Red"
+        }
+      },
+      "stop": {
+        "title": "Elige la parada",
+        "description": "Paradas de {network} ordenadas por distancia a la ubicación de tu Home Assistant.",
+        "data": {
+          "stop_id": "Parada"
+        }
+      },
+      "directions": {
+        "title": "Elige los sentidos",
+        "description": "Sentidos disponibles en {stop}. Se creará un sensor por cada uno.",
+        "data": {
+          "directions": "Sentidos"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se pudo descargar el horario oficial. Comprueba la conexión a internet y reinténtalo."
+    },
+    "abort": {
+      "already_configured": "Esa parada ya está configurada.",
+      "stop_not_found": "La parada ya no existe en el horario oficial."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sentidos a mostrar",
+        "description": "Marca los sentidos que quieres tener como sensores.",
+        "data": {
+          "directions": "Sentidos"
+        }
+      }
+    },
+    "abort": {
+      "cannot_connect": "No se pudo descargar el horario oficial.",
+      "stop_not_found": "La parada ya no existe en el horario oficial."
+    }
+  }
+}

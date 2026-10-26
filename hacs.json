@@ -1,0 +1,5 @@
+{
+  "name": "Bilbao Transit",
+  "render_readme": true,
+  "homeassistant": "2024.6.0"
+}
