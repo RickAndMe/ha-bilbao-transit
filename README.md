@@ -98,6 +98,8 @@ aparecen sin tocar nada.
 ```yaml
 type: markdown
 content: |
+  {%- set emoji_red = {'Metro Bilbao': '🚇', 'Euskotren Tranvía Bilbao': '🚊',
+                       'Bizkaibus': '🚌', 'Bilbobus': '🚌'} -%}
   {%- set ents = states.sensor | selectattr('attributes.next_departures', 'defined')
        | rejectattr('attributes.next_departures', 'equalto', []) | list -%}
   {%- set con_min = ents | selectattr('attributes.next_minutes', 'defined')
@@ -108,9 +110,11 @@ content: |
   {%- set sal = e.attributes.next_departures -%}
   {%- set s0 = sal[0] -%}
   {%- set m = e.attributes.next_minutes if e.attributes.next_minutes is defined else s0.minutes -%}
-  {%- set etiqueta = e.attributes.direction_label if e.attributes.direction_label is defined else (e.attributes.line or e.name) -%}
-  {%- set ico = e.attributes.network_emoji if e.attributes.network_emoji is defined else '🚏' -%}
-  - {{ ico }} {% if m <= 3 %}<strong style="color:var(--error-color)">{{ m }} min</strong>{% else %}**{{ m }} min**{% endif %} → {{ etiqueta }}{% if s0.destination not in etiqueta %} · {{ s0.line ~ ' ' if s0.line }}{{ s0.destination }}{% endif %} <span style="opacity:.45">{{ s0.departure }}{% if sal | length > 1 %} · luego {{ sal[1].minutes }}{% if sal | length > 2 %} y {{ sal[2].minutes }}{% endif %} min{% endif %}</span> {{ '⚪' if e.attributes.data_source == 'schedule' else '🟢' }}
+  {%- set red = e.attributes.network -%}
+  {%- set parada = e.attributes.stop_name -%}
+  {%- set etiqueta = e.attributes.direction_label if e.attributes.direction_label is defined else (e.name | replace('(' ~ red ~ ')', '') | replace(parada, '') | trim | replace('hacia ', '')) -%}
+  {%- set ico = e.attributes.network_emoji if e.attributes.network_emoji is defined else emoji_red.get(red, '🚏') -%}
+  - {{ ico }} {% if m <= 3 %}<strong style="color:var(--error-color)">{{ m }}&nbsp;min</strong>{% else %}**{{ m }}&nbsp;min**{% endif %} → {{ etiqueta }}{% if s0.destination not in etiqueta %} · {{ s0.line ~ ' ' if s0.line }}{{ s0.destination }}{% endif %} <span style="opacity:.45;white-space:nowrap">{{ s0.departure }}{% if sal | length > 1 %} · luego {{ sal[1].minutes }}{% if sal | length > 2 %} y {{ sal[2].minutes }}{% endif %}&nbsp;min{% endif %}</span> {{ '⚪' if e.attributes.data_source == 'schedule' else '🟢' }}
   {% endfor -%}
 
   <small>🟢 tiempo real · ⚪ horario programado</small>
