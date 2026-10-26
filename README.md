@@ -77,7 +77,7 @@ content: |
 
   **{{ titulo }}**
   {% for s in salidas -%}
-  · {{ s.departure }} · {{ s.line ~ ' ' if s.line }}{% if s.destination %}{{ s.destination }}{% endif %} — **{{ s.minutes }} min**
+  · {{ s.departure }} · {{ s.line ~ ' ' if s.line }}{{ s.destination or s.headsign }} — **{{ s.minutes }} min**
   {% endfor %}
   {%- endif %}
   {%- endfor %}
