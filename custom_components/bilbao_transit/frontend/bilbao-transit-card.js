@@ -40,7 +40,7 @@ const CSS = `
   .dest { font-size: 16px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { margin-top: 3px; font-size: 12.5px; color: var(--secondary-text-color); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
   .prox { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 7px; margin-top: 4px; }
-  .prox .p { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  .prox .p { flex: 1 1 0; max-width: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
              padding: 6px 4px; border-radius: 12px; background: var(--cbg); border: 1px solid var(--clinea); }
   .prox .p b { font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -1px;
                color: var(--primary-text-color); font-variant-numeric: tabular-nums; }
