@@ -39,6 +39,13 @@ const CSS = `
   .info { min-width: 0; }
   .dest { font-size: 16px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { margin-top: 3px; font-size: 12.5px; color: var(--secondary-text-color); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .prox { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 7px; margin-top: 4px; }
+  .prox .p { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+             padding: 6px 4px; border-radius: 12px; background: var(--cbg); border: 1px solid var(--clinea); }
+  .prox .p b { font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -1px;
+               color: var(--primary-text-color); font-variant-numeric: tabular-nums; }
+  .prox .p i { font-style: normal; font-size: 9.5px; line-height: 1; letter-spacing: 1.2px;
+               text-transform: uppercase; color: var(--secondary-text-color); }
   .lin { padding: 1px 7px; border-radius: 6px; background: var(--cbg); border: 1px solid var(--clinea); color: var(--primary-text-color); font-weight: 600; font-size: 11.5px; }
   .live { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; animation: bt-brillo 2.2s ease-in-out infinite; }
@@ -86,7 +93,7 @@ class BilbaoTransitCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { title: "Transporte", max: 8, ...config };
+    this._config = { title: "Transporte", max: 8, siguientes: 2, ...config };
     this._montado = false;
     try {
       this._render();
@@ -199,6 +206,7 @@ class BilbaoTransitCard extends HTMLElement {
         <div class="dest"></div>
         <div class="meta"><span class="lin"></span><span class="hora"></span><span class="live"><span class="dot"></span><span class="txt"></span></span></div>
       </div>
+      <div class="prox"></div>
       <div class="via"><div class="rail"></div><div class="veh"><em></em><em></em></div><div class="fin"></div></div>`;
     fila.dataset.entity = id;
     fila.addEventListener("click", () => {
@@ -232,12 +240,27 @@ class BilbaoTransitCard extends HTMLElement {
     fila.querySelector(".dest").textContent = destino;
 
     const hora = fila.querySelector(".hora");
-    let textoHora = salidas[0].departure || "";
-    if (salidas.length > 1) {
-      const siguientes = salidas.slice(1, 3).map((s) => s.minutes).join(" y ");
-      textoHora += ` · ${this._t("luego")} ${siguientes} ${this._t("min")}`;
+    hora.textContent = salidas[0].departure || "";
+
+    // las siguientes salidas, en grande: sirven para decidir si da tiempo a bajar
+    const prox = fila.querySelector(".prox");
+    const cuantas = Math.max(0, Number(this._config.siguientes ?? 2));
+    const siguientes = salidas.slice(1, 1 + cuantas);
+    const claveProx = siguientes.map((s) => s.minutes).join("|");
+    if (prox.dataset.clave !== claveProx) {
+      prox.dataset.clave = claveProx;
+      prox.innerHTML = siguientes
+        .map(
+          (s) =>
+            '<div class="p"><b>' +
+            s.minutes +
+            "</b><i>" +
+            this._t("min") +
+            "</i></div>"
+        )
+        .join("");
+      prox.style.display = siguientes.length ? "" : "none";
     }
-    hora.textContent = textoHora;
 
     const enDirecto = attrs.data_source === "realtime";
     fila.querySelector(".dot").classList.toggle("gris", !enDirecto);

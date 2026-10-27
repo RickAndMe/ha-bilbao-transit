@@ -102,6 +102,10 @@ actualizar, aparece `Bilbao Transit` en el selector de tarjetas del dashboard.
 type: custom:bilbao-transit-card
 title: Bolueta      # opcional
 max: 8             # opcional: cuántas salidas mostrar
+siguientes: 2      # opcional: cuántas salidas siguientes salen en grande
+entities:          # opcional: solo estos sensores (para separar redes)
+  - sensor.bolueta_metro_bilbao_hacia_bilbao_norte
+  - sensor.bolueta_euskotren_tranvia_bilbao_hacia_la_casilla
 ```
 
 Qué hace:
@@ -109,6 +113,9 @@ Qué hace:
 - **Lo que llega antes, arriba.** Ordena todas las salidas por minutos, sin importar
   la red.
 - **El número manda**: los minutos en grande, lo primero que ve el ojo.
+- **Las siguientes salidas, también en grande.** Además del próximo, la tarjeta pinta
+  los siguientes trenes o buses en cifras del mismo tamaño, para decidir si te da
+  tiempo a bajar o te toca esperar al de después (`siguientes`, 2 por defecto).
 - **Color por red**: metro rojo, tranvía turquesa, Bizkaibus ámbar, Bilbobus azul.
 - **La vía de abajo no es decoración**: el vehículo se coloca según lo que falta, así
   que de un vistazo sabes qué está a punto de entrar sin leer ningún número.
