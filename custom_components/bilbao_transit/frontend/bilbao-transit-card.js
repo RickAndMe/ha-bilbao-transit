@@ -18,7 +18,9 @@ const TEXTOS = {
 };
 
 const CSS = `
-  :host { display: block; }
+  /* los colores del texto de las filas NO salen del tema: la fila es siempre oscura,
+     y en tema claro --primary-text-color (#212121) sobre este fondo es ilegible */
+  :host { display: block; --bt-texto: #eef1f6; --bt-sub: #9aa4b4; }
   .cab { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 4px 12px; }
   .cab h2 { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
             font-size: 19px; font-weight: 600; letter-spacing: .2px; color: var(--primary-text-color); }
@@ -33,20 +35,20 @@ const CSS = `
   .badge { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; font-size: 24px;
            background: var(--cbg); border: 1px solid var(--clinea); }
   .mins { text-align: center; line-height: 1; }
-  .mins b { display: block; font-size: 38px; font-weight: 700; letter-spacing: -1.5px; color: var(--bt-num, var(--primary-text-color));
+  .mins b { display: block; font-size: 38px; font-weight: 700; letter-spacing: -1.5px; color: var(--bt-num, var(--bt-texto));
             font-variant-numeric: tabular-nums; transition: color .3s ease; }
-  .mins i { font-style: normal; font-size: 11.5px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--bt-min, var(--secondary-text-color)); }
+  .mins i { font-style: normal; font-size: 11.5px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--bt-min, var(--bt-sub)); }
   .info { min-width: 0; }
-  .dest { font-size: 16px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .meta { margin-top: 3px; font-size: 12.5px; color: var(--secondary-text-color); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .dest { font-size: 16px; font-weight: 600; color: var(--bt-texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { margin-top: 3px; font-size: 12.5px; color: var(--bt-sub); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
   .prox { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 7px; margin-top: 4px; }
   .prox .p { flex: 1 1 0; max-width: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
              padding: 6px 4px; border-radius: 12px; background: var(--cbg); border: 1px solid var(--clinea); }
   .prox .p b { font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -1px;
-               color: var(--primary-text-color); font-variant-numeric: tabular-nums; }
+               color: var(--bt-texto); font-variant-numeric: tabular-nums; }
   .prox .p i { font-style: normal; font-size: 9.5px; line-height: 1; letter-spacing: 1.2px;
-               text-transform: uppercase; color: var(--secondary-text-color); }
-  .lin { padding: 1px 7px; border-radius: 6px; background: var(--cbg); border: 1px solid var(--clinea); color: var(--primary-text-color); font-weight: 600; font-size: 11.5px; }
+               text-transform: uppercase; color: var(--bt-sub); }
+  .lin { padding: 1px 7px; border-radius: 6px; background: var(--cbg); border: 1px solid var(--clinea); color: var(--bt-texto); font-weight: 600; font-size: 11.5px; }
   .live { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; animation: bt-brillo 2.2s ease-in-out infinite; }
   .dot.gris { background: #7b8494; animation: none; }
